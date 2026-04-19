@@ -6,12 +6,19 @@
 
 set -e
 
+interval=18060   # 5h 1m — lands just after each window expires
+
 while true; do
   ts="$(date -u +%FT%TZ)"
-  if claude -p "keepalive" </dev/null >/dev/null 2>&1; then
+  if response=$(claude -p "keepalive" </dev/null 2>&1); then
     echo "[$ts] ping ok"
   else
     echo "[$ts] ping failed"
   fi
-  sleep 18060   # 5h 1m — lands just after each window expires
+  printf '%s\n' "$response" | sed 's/^/  /'
+  next_utc=$(date -u -r "$(($(date +%s) + interval))" +%FT%TZ 2>/dev/null \
+          || date -u -d "@$(($(date +%s) + interval))" +%FT%TZ)
+  echo "next ping at"
+  echo "  $next_utc"
+  sleep "$interval"
 done
