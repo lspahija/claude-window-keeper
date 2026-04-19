@@ -1,25 +1,42 @@
 #!/usr/bin/env bash
-# claude-window-keeper — keep the Claude Code 5-hour window perpetually open.
-# Sends "keepalive" to `claude -p` every 5 hours (just past each window's expiry).
-# Logs to stdout.
-# MIT licensed. https://github.com/lspahija/claude-window-keeper
+# claude-window-keeper — keep the Claude Code 5-hour usage window perpetually open.
+# Sends "keepalive" to `claude -p` a minute after each window's reset.
+# The reset time is read from the `rate_limit_event` in the ping's stream-json
+# response, so the keepalive itself serves as the probe — no extra API call.
+# Logs to stdout. MIT licensed. https://github.com/lspahija/claude-window-keeper
 
 set -e
 
-interval=18060   # 5h 1m — lands just after each window expires
+buffer=60   # seconds past reset before the next ping
+
+epoch_to_utc() {
+  date -u -r "$1" +%FT%TZ 2>/dev/null || date -u -d "@$1" +%FT%TZ
+}
 
 while true; do
   echo "[$(date -u +%FT%TZ)] pinging claude..."
-  if response=$(claude -p "keepalive" </dev/null 2>&1); then
-    status="ok"
-  else
-    status="failed"
+  response=$(claude -p --output-format stream-json --verbose "keepalive" </dev/null 2>&1) || true
+
+  reply=$(printf '%s\n' "$response" \
+    | grep '"type":"result"' \
+    | sed -n 's/.*"result":"\([^"]*\)".*/\1/p' \
+    | head -1)
+
+  resets_at=$(printf '%s\n' "$response" \
+    | grep '"type":"rate_limit_event"' \
+    | grep '"rateLimitType":"five_hour"' \
+    | grep -o '"resetsAt":[0-9]*' \
+    | head -1 \
+    | cut -d: -f2)
+
+  if [ -z "$resets_at" ]; then
+    echo "error: could not parse resetsAt from claude response" >&2
+    printf '%s\n' "$response" >&2
+    exit 1
   fi
-  reply=$(printf '%s' "$response" | tr '\n' ' ' | sed 's/[[:space:]]\{1,\}/ /g; s/^ //; s/ $//')
-  echo "ping $status"
-  echo "claude: $reply"
-  next_utc=$(date -u -r "$(($(date +%s) + interval))" +%FT%TZ 2>/dev/null \
-          || date -u -d "@$(($(date +%s) + interval))" +%FT%TZ)
-  echo "next ping at $next_utc"
-  sleep "$interval"
+
+  sleep_for=$(( resets_at - $(date +%s) + buffer ))
+  echo "claude: ${reply:-(no reply parsed)}"
+  echo "next ping at $(epoch_to_utc "$(( resets_at + buffer ))") (window resets at $(epoch_to_utc "$resets_at"))"
+  sleep "$sleep_for"
 done
