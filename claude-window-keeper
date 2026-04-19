@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# claude-window-keeper — keep the Claude Code 5-hour window perpetually open.
+# Sends "keepalive" to `claude -p` every 5 hours (just past each window's expiry).
+# Logs to stdout.
+# MIT licensed. https://github.com/<username>/claude-window-keeper
+
+set -e
+
+while true; do
+  ts="$(date -u +%FT%TZ)"
+  if claude -p "keepalive" </dev/null >/dev/null 2>&1; then
+    echo "[$ts] ping ok"
+  else
+    echo "[$ts] ping failed"
+  fi
+  sleep 18060   # 5h 1m — lands just after each window expires
+done
