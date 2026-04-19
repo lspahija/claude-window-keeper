@@ -2,7 +2,7 @@
 # claude-window-keeper — keep the Claude Code 5-hour window perpetually open.
 # Sends "keepalive" to `claude -p` every 5 hours (just past each window's expiry).
 # Logs to stdout.
-# MIT licensed. https://github.com/<username>/claude-window-keeper
+# MIT licensed. https://github.com/lspahija/claude-window-keeper
 
 set -e
 

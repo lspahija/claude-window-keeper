@@ -19,7 +19,7 @@ A one-line message, ~5 times a day. Insignificant token usage.
 ## Setup
 
 ```sh
-git clone https://github.com/<username>/claude-window-keeper.git
+git clone https://github.com/lspahija/claude-window-keeper.git
 cd claude-window-keeper
 chmod +x claude-window-keeper
 ./claude-window-keeper
